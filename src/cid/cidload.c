@@ -1,19 +1,19 @@
-/***************************************************************************/
-/*                                                                         */
-/*  cidload.c                                                              */
-/*                                                                         */
-/*    CID-keyed Type1 font loader (body).                                  */
-/*                                                                         */
-/*  Copyright 1996-2016 by                                                 */
-/*  David Turner, Robert Wilhelm, and Werner Lemberg.                      */
-/*                                                                         */
-/*  This file is part of the FreeType project, and may only be used,       */
-/*  modified, and distributed under the terms of the FreeType project      */
-/*  license, LICENSE.TXT.  By continuing to use, modify, or distribute     */
-/*  this file you indicate that you have read the license and              */
-/*  understand and accept it fully.                                        */
-/*                                                                         */
-/***************************************************************************/
+/****************************************************************************
+ *
+ * cidload.c
+ *
+ *   CID-keyed Type1 font loader (body).
+ *
+ * Copyright 1996-2018 by
+ * David Turner, Robert Wilhelm, and Werner Lemberg.
+ *
+ * This file is part of the FreeType project, and may only be used,
+ * modified, and distributed under the terms of the FreeType project
+ * license, LICENSE.TXT.  By continuing to use, modify, or distribute
+ * this file you indicate that you have read the license and
+ * understand and accept it fully.
+ *
+ */
 
 
 #include <ft2build.h>
@@ -27,12 +27,12 @@
 #include "ciderrs.h"
 
 
-  /*************************************************************************/
-  /*                                                                       */
-  /* The macro FT_COMPONENT is used in trace mode.  It is an implicit      */
-  /* parameter of the FT_TRACE() and FT_ERROR() macros, used to print/log  */
-  /* messages during execution.                                            */
-  /*                                                                       */
+  /**************************************************************************
+   *
+   * The macro FT_COMPONENT is used in trace mode.  It is an implicit
+   * parameter of the FT_TRACE() and FT_ERROR() macros, used to print/log
+   * messages during execution.
+   */
 #undef  FT_COMPONENT
 #define FT_COMPONENT  trace_cidload
 
@@ -200,6 +200,13 @@
       matrix->xy = temp[2];
       matrix->yy = temp[3];
 
+      if ( !FT_Matrix_Check( matrix ) )
+      {
+        FT_ERROR(( "t1_parse_font_matrix: invalid font matrix\n" ));
+        parser->root.error = FT_THROW( Invalid_File_Format );
+        return FT_THROW( Invalid_File_Format );
+      }
+
       /* note that the font offsets are expressed in integer font units */
       offset->x  = temp[4] >> 16;
       offset->y  = temp[5] >> 16;
@@ -263,14 +270,18 @@
 
       cid->num_dicts = num_dicts;
 
-      /* don't forget to set a few defaults */
+      /* set some default values (the same as for Type 1 fonts) */
       for ( n = 0; n < cid->num_dicts; n++ )
       {
         CID_FaceDict  dict = cid->font_dicts + n;
 
 
-        /* default value for lenIV */
-        dict->private_dict.lenIV = 4;
+        dict->private_dict.blue_shift       = 7;
+        dict->private_dict.blue_fuzz        = 1;
+        dict->private_dict.lenIV            = 4;
+        dict->private_dict.expansion_factor = (FT_Fixed)( 0.06 * 0x10000L );
+        dict->private_dict.blue_scale       = (FT_Fixed)(
+                                                0.039625 * 0x10000L * 1000 );
       }
     }
 
@@ -461,6 +472,9 @@
       FT_Byte*      p;
 
 
+      if ( !num_subrs )
+        continue;
+
       /* reallocate offsets array if needed */
       if ( num_subrs + 1 > max_offsets )
       {
@@ -570,7 +584,7 @@
   {
     FT_UNUSED( face );
 
-    FT_MEM_ZERO( loader, sizeof ( *loader ) );
+    FT_ZERO( loader );
   }
 
 
@@ -733,9 +747,11 @@
       }
 
       /* we must convert the data section from hexadecimal to binary */
-      if ( FT_ALLOC( face->binary_data, parser->binary_length )         ||
-           cid_hex_to_binary( face->binary_data, parser->binary_length,
-                              parser->data_offset, face )               )
+      if ( FT_ALLOC( face->binary_data, parser->binary_length )    ||
+           FT_SET_ERROR( cid_hex_to_binary( face->binary_data,
+                                            parser->binary_length,
+                                            parser->data_offset,
+                                            face ) )               )
         goto Exit;
 
       FT_Stream_OpenMemory( face->cid_stream,
@@ -752,7 +768,7 @@
 
     if ( cid->fd_bytes < 0 || cid->gd_bytes < 1 )
     {
-      FT_ERROR(( "cid_parse_dict:"
+      FT_ERROR(( "cid_face_open:"
                  " Invalid `FDBytes' or `GDBytes' value\n" ));
       error = FT_THROW( Invalid_File_Format );
       goto Exit;
@@ -761,7 +777,7 @@
     /* allow at most 32bit offsets */
     if ( cid->fd_bytes > 4 || cid->gd_bytes > 4 )
     {
-      FT_ERROR(( "cid_parse_dict:"
+      FT_ERROR(( "cid_face_open:"
                  " Values of `FDBytes' or `GDBytes' larger than 4\n"
                  "               "
                  " are not supported\n" ));
@@ -777,16 +793,36 @@
       CID_FaceDict  dict = cid->font_dicts + n;
 
 
-      if ( dict->sd_bytes < 0 )
+      /* the upper limits are ad-hoc values */
+      if ( dict->private_dict.blue_shift > 1000 ||
+           dict->private_dict.blue_shift < 0    )
       {
-        FT_ERROR(( "cid_parse_dict: Invalid `SDBytes' value\n" ));
+        FT_TRACE2(( "cid_face_open:"
+                    " setting unlikely BlueShift value %d to default (7)\n",
+                    dict->private_dict.blue_shift ));
+        dict->private_dict.blue_shift = 7;
+      }
+
+      if ( dict->private_dict.blue_fuzz > 1000 ||
+           dict->private_dict.blue_fuzz < 0    )
+      {
+        FT_TRACE2(( "cid_face_open:"
+                    " setting unlikely BlueFuzz value %d to default (1)\n",
+                    dict->private_dict.blue_fuzz ));
+        dict->private_dict.blue_fuzz = 1;
+      }
+
+      if ( dict->sd_bytes < 0                        ||
+           ( dict->num_subrs && dict->sd_bytes < 1 ) )
+      {
+        FT_ERROR(( "cid_face_open: Invalid `SDBytes' value\n" ));
         error = FT_THROW( Invalid_File_Format );
         goto Exit;
       }
 
       if ( dict->sd_bytes > 4 )
       {
-        FT_ERROR(( "cid_parse_dict:"
+        FT_ERROR(( "cid_face_open:"
                    " Values of `SDBytes' larger than 4"
                    " are not supported\n" ));
         error = FT_THROW( Invalid_File_Format );
@@ -795,7 +831,7 @@
 
       if ( dict->subrmap_offset > binary_length )
       {
-        FT_ERROR(( "cid_parse_dict: Invalid `SubrMapOffset' value\n" ));
+        FT_ERROR(( "cid_face_open: Invalid `SubrMapOffset' value\n" ));
         error = FT_THROW( Invalid_File_Format );
         goto Exit;
       }
@@ -806,7 +842,7 @@
              dict->num_subrs > ( binary_length - dict->subrmap_offset ) /
                                  (FT_UInt)dict->sd_bytes                 ) )
       {
-        FT_ERROR(( "cid_parse_dict: Invalid `SubrCount' value\n" ));
+        FT_ERROR(( "cid_face_open: Invalid `SubrCount' value\n" ));
         error = FT_THROW( Invalid_File_Format );
         goto Exit;
       }
@@ -814,7 +850,7 @@
 
     if ( cid->cidmap_offset > binary_length )
     {
-      FT_ERROR(( "cid_parse_dict: Invalid `CIDMapOffset' value\n" ));
+      FT_ERROR(( "cid_face_open: Invalid `CIDMapOffset' value\n" ));
       error = FT_THROW( Invalid_File_Format );
       goto Exit;
     }
@@ -823,7 +859,7 @@
          cid->cid_count >
            ( binary_length - cid->cidmap_offset ) / entry_len )
     {
-      FT_ERROR(( "cid_parse_dict: Invalid `CIDCount' value\n" ));
+      FT_ERROR(( "cid_face_open: Invalid `CIDCount' value\n" ));
       error = FT_THROW( Invalid_File_Format );
       goto Exit;
     }

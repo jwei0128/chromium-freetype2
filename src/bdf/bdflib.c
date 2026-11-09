@@ -22,13 +22,13 @@
  * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-  /*************************************************************************/
-  /*                                                                       */
-  /*  This file is based on bdf.c,v 1.22 2000/03/16 20:08:50               */
-  /*                                                                       */
-  /*  taken from Mark Leisher's xmbdfed package                            */
-  /*                                                                       */
-  /*************************************************************************/
+  /**************************************************************************
+   *
+   * This file is based on bdf.c,v 1.22 2000/03/16 20:08:50
+   *
+   * taken from Mark Leisher's xmbdfed package
+   *
+   */
 
 
 #include <ft2build.h>
@@ -42,21 +42,21 @@
 #include "bdferror.h"
 
 
-  /*************************************************************************/
-  /*                                                                       */
-  /* The macro FT_COMPONENT is used in trace mode.  It is an implicit      */
-  /* parameter of the FT_TRACE() and FT_ERROR() macros, used to print/log  */
-  /* messages during execution.                                            */
-  /*                                                                       */
+  /**************************************************************************
+   *
+   * The macro FT_COMPONENT is used in trace mode.  It is an implicit
+   * parameter of the FT_TRACE() and FT_ERROR() macros, used to print/log
+   * messages during execution.
+   */
 #undef  FT_COMPONENT
 #define FT_COMPONENT  trace_bdflib
 
 
-  /*************************************************************************/
-  /*                                                                       */
-  /* Default BDF font options.                                             */
-  /*                                                                       */
-  /*************************************************************************/
+  /**************************************************************************
+   *
+   * Default BDF font options.
+   *
+   */
 
 
   static const bdf_options_t  _bdf_opts =
@@ -68,11 +68,11 @@
   };
 
 
-  /*************************************************************************/
-  /*                                                                       */
-  /* Builtin BDF font properties.                                          */
-  /*                                                                       */
-  /*************************************************************************/
+  /**************************************************************************
+   *
+   * Builtin BDF font properties.
+   *
+   */
 
   /* List of most properties that might appear in a font.  Doesn't include */
   /* the RAW_* and AXIS_* properties in X11R6 polymorphic fonts.           */
@@ -219,11 +219,11 @@
 #define DBGMSG2  " (0x%lX)\n"
 
 
-  /*************************************************************************/
-  /*                                                                       */
-  /* Utility types and functions.                                          */
-  /*                                                                       */
-  /*************************************************************************/
+  /**************************************************************************
+   *
+   * Utility types and functions.
+   *
+   */
 
 
   /* Function type for parsing lines of a BDF font. */
@@ -704,7 +704,15 @@
       return 0;
 
     for ( v = 0; sbitset( ddigits, *s ); s++ )
-      v = v * 10 + a2i[(int)*s];
+    {
+      if ( v < ( FT_ULONG_MAX - 9 ) / 10 )
+        v = v * 10 + a2i[(int)*s];
+      else
+      {
+        v = FT_ULONG_MAX;
+        break;
+      }
+    }
 
     return v;
   }
@@ -729,7 +737,15 @@
     }
 
     for ( v = 0; sbitset( ddigits, *s ); s++ )
-      v = v * 10 + a2i[(int)*s];
+    {
+      if ( v < ( FT_LONG_MAX - 9 ) / 10 )
+        v = v * 10 + a2i[(int)*s];
+      else
+      {
+        v = FT_LONG_MAX;
+        break;
+      }
+    }
 
     return ( !neg ) ? v : -v;
   }
@@ -746,7 +762,15 @@
       return 0;
 
     for ( v = 0; sbitset( ddigits, *s ); s++ )
-      v = (unsigned short)( v * 10 + a2i[(int)*s] );
+    {
+      if ( v < ( FT_USHORT_MAX - 9 ) / 10 )
+        v = (unsigned short)( v * 10 + a2i[(int)*s] );
+      else
+      {
+        v = FT_USHORT_MAX;
+        break;
+      }
+    }
 
     return v;
   }
@@ -771,7 +795,15 @@
     }
 
     for ( v = 0; sbitset( ddigits, *s ); s++ )
-      v = (short)( v * 10 + a2i[(int)*s] );
+    {
+      if ( v < ( SHRT_MAX - 9 ) / 10 )
+        v = (short)( v * 10 + a2i[(int)*s] );
+      else
+      {
+        v = SHRT_MAX;
+        break;
+      }
+    }
 
     return (short)( ( !neg ) ? v : -v );
   }
@@ -868,11 +900,11 @@
   }
 
 
-  /*************************************************************************/
-  /*                                                                       */
-  /* BDF font file parsing flags and functions.                            */
-  /*                                                                       */
-  /*************************************************************************/
+  /**************************************************************************
+   *
+   * BDF font file parsing flags and functions.
+   *
+   */
 
 
   /* Parse flags. */
@@ -1119,7 +1151,7 @@
     /* See whether this property type exists yet or not. */
     /* If not, create it.                                */
     propid = ft_hash_str_lookup( name, &(font->proptbl) );
-    if ( propid == NULL )
+    if ( !propid )
     {
       error = bdf_create_property( name, BDF_ATOM, font );
       if ( error )
@@ -1144,7 +1176,7 @@
       }
 
       fp = font->props + font->props_size;
-      FT_MEM_ZERO( fp, sizeof ( bdf_property_t ) );
+      FT_ZERO( fp );
       font->props_size++;
     }
 
@@ -1524,6 +1556,9 @@
       goto Exit;
     }
 
+    if ( !( p->flags & BDF_ENCODING_ ) )
+      goto Missing_Encoding;
+
     /* Point at the glyph being constructed. */
     if ( p->glyph_enc == -1 )
       glyph = font->unencoded + ( font->unencoded_used - 1 );
@@ -1594,9 +1629,6 @@
     /* Expect the SWIDTH (scalable width) field next. */
     if ( _bdf_strncmp( line, "SWIDTH", 6 ) == 0 )
     {
-      if ( !( p->flags & BDF_ENCODING_ ) )
-        goto Missing_Encoding;
-
       error = _bdf_list_split( &p->list, (char *)" +", line, linelen );
       if ( error )
         goto Exit;
@@ -1610,9 +1642,6 @@
     /* Expect the DWIDTH (scalable width) field next. */
     if ( _bdf_strncmp( line, "DWIDTH", 6 ) == 0 )
     {
-      if ( !( p->flags & BDF_ENCODING_ ) )
-        goto Missing_Encoding;
-
       error = _bdf_list_split( &p->list, (char *)" +", line, linelen );
       if ( error )
         goto Exit;
@@ -1638,9 +1667,6 @@
     /* Expect the BBX field next. */
     if ( _bdf_strncmp( line, "BBX", 3 ) == 0 )
     {
-      if ( !( p->flags & BDF_ENCODING_ ) )
-        goto Missing_Encoding;
-
       error = _bdf_list_split( &p->list, (char *)" +", line, linelen );
       if ( error )
         goto Exit;
@@ -2164,11 +2190,11 @@
   }
 
 
-  /*************************************************************************/
-  /*                                                                       */
-  /* API.                                                                  */
-  /*                                                                       */
-  /*************************************************************************/
+  /**************************************************************************
+   *
+   * API.
+   *
+   */
 
 
   FT_LOCAL_DEF( FT_Error )
@@ -2301,7 +2327,7 @@
         p->font->comments[p->font->comments_len] = 0;
       }
     }
-    else if ( error == FT_Err_Ok )
+    else if ( !error )
       error = FT_THROW( Invalid_File_Format );
 
     *font = p->font;

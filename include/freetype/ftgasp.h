@@ -1,19 +1,19 @@
-/***************************************************************************/
-/*                                                                         */
-/*  ftgasp.h                                                               */
-/*                                                                         */
-/*    Access of TrueType's `gasp' table (specification).                   */
-/*                                                                         */
-/*  Copyright 2007-2016 by                                                 */
-/*  David Turner, Robert Wilhelm, and Werner Lemberg.                      */
-/*                                                                         */
-/*  This file is part of the FreeType project, and may only be used,       */
-/*  modified, and distributed under the terms of the FreeType project      */
-/*  license, LICENSE.TXT.  By continuing to use, modify, or distribute     */
-/*  this file you indicate that you have read the license and              */
-/*  understand and accept it fully.                                        */
-/*                                                                         */
-/***************************************************************************/
+/****************************************************************************
+ *
+ * ftgasp.h
+ *
+ *   Access of TrueType's `gasp' table (specification).
+ *
+ * Copyright 2007-2018 by
+ * David Turner, Robert Wilhelm, and Werner Lemberg.
+ *
+ * This file is part of the FreeType project, and may only be used,
+ * modified, and distributed under the terms of the FreeType project
+ * license, LICENSE.TXT.  By continuing to use, modify, or distribute
+ * this file you indicate that you have read the license and
+ * understand and accept it fully.
+ *
+ */
 
 
 #ifndef FTGASP_H_
@@ -27,6 +27,9 @@
 #error "Please fix the directory search order for header files"
 #error "so that freetype.h of FreeType 2 is found first."
 #endif
+
+
+FT_BEGIN_HEADER
 
 
   /***************************************************************************
@@ -92,26 +95,36 @@
 #define FT_GASP_NO_TABLE               -1
 #define FT_GASP_DO_GRIDFIT           0x01
 #define FT_GASP_DO_GRAY              0x02
+#define FT_GASP_SYMMETRIC_GRIDFIT    0x04
 #define FT_GASP_SYMMETRIC_SMOOTHING  0x08
-#define FT_GASP_SYMMETRIC_GRIDFIT    0x10
 
 
   /*************************************************************************
    *
-   * @func:
+   * @function:
    *   FT_Get_Gasp
    *
    * @description:
-   *   Read the `gasp' table from a TrueType or OpenType font file and
-   *   return the entry corresponding to a given character pixel size.
+   *   For a TrueType or OpenType font file, return the rasterizer behaviour
+   *   flags from the font's `gasp' table corresponding to a given
+   *   character pixel size.
    *
    * @input:
-   *   face :: The source face handle.
-   *   ppem :: The vertical character pixel size.
+   *   face ::
+   *     The source face handle.
+   *
+   *   ppem ::
+   *     The vertical character pixel size.
    *
    * @return:
    *   Bit flags (see @FT_GASP_XXX), or @FT_GASP_NO_TABLE if there is no
    *   `gasp' table in the face.
+   *
+   * @note:
+   *   If you want to use the MM functionality of OpenType variation fonts
+   *   (i.e., using @FT_Set_Var_Design_Coordinates and friends), call this
+   *   function *after* setting an instance since the return values can
+   *   change.
    *
    * @since:
    *   2.3.0
@@ -122,6 +135,8 @@
 
   /* */
 
+
+FT_END_HEADER
 
 #endif /* FTGASP_H_ */
 
